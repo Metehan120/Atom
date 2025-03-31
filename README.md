@@ -14,7 +14,7 @@
 |------------|--------------|--------------|
 | 400MB .exe | ~1.8 Seconds | ~2.2 Seconds |
 | 200MB .exe | ~800 MS      | ~1 Seconds   |
-| 100MB .exe | ~500 MS      | ~500 MS      |
+| 100MB .exe | ~350 MS      | ~400 MS      |
 
 # How to use:
 ```rust
