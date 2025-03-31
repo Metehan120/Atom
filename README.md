@@ -10,7 +10,7 @@
 2. Atom using LZ4 & ZSTD because of that you should able switch between Speed and Efficiency.
 
 # Benchmarks (Without Encryption):
-| Algorithms | LZ4 (0)      | ZSTD         |
+| Algorithms | LZ4          | ZSTD (0)     |
 |------------|--------------|--------------|
 | 400MB .exe | ~2.4 Seconds | ~2.8 Seconds |
 | 200MB .exe | ~1.2 Seconds | ~1.2 Seconds |
