@@ -2,6 +2,8 @@
 name = "atom"
 version = "1.0.0"
 edition = "2024"
+description = "Atom Fastest Archive Format"
+license = "MIT"
 
 [dependencies]
 memchr = "2.7.4"
