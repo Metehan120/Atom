@@ -1,6 +1,6 @@
 # Atom
 
-## What is Atom?:
+## What Atom?:
 1. Atom is a File Archive like Rar & Zip but its making something different: Instead of searhing through whole Archive Atom is just finding sepcific File and working on it.
 2. Atom using Rayon & Tokio to make thing Parallel and Async because of this the performance impact is significant.
 3. Atom is an just Rust Library for now, soon CLI and GUI will be added.
