@@ -12,8 +12,8 @@
 # Benchmarks (Without Encryption and Mid-End Computer):
 | Algorithms | LZ4          | ZSTD         |
 |------------|--------------|--------------|
-| 400MB .exe | ~2.4 Seconds | ~2.8 Seconds |
-| 200MB .exe | ~1.2 Seconds | ~1.2 Seconds |
+| 400MB .exe | ~1.8 Seconds | ~2.2 Seconds |
+| 200MB .exe | ~800 MS      | ~1 Seconds   |
 | 100MB .exe | ~500 MS      | ~500 MS      |
 
 # How to use:
