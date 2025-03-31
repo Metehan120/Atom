@@ -1,5 +1,5 @@
 [package]
-name = "atom"
+name = "atom-archive"
 version = "1.0.0"
 edition = "2024"
 description = "Atom Fastest Archive Format"
