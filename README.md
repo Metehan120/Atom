@@ -9,12 +9,12 @@
 1. As I mentioned before Atom using full potentionel of CPU, because of that Atom way faster.
 2. Atom using LZ4 & ZSTD because of that you should able switch between Speed and Efficiency.
 
-# Benchmarks (Without Encryption and Mid-End Computer):
-| Algorithms | LZ4          | ZSTD         |
+# Benchmarks (Without Encryption):
+| Algorithms | LZ4 (0)      | ZSTD         |
 |------------|--------------|--------------|
-| 400MB .exe | ~1.8 Seconds | ~2.2 Seconds |
-| 200MB .exe | ~800 MS      | ~1 Seconds   |
-| 100MB .exe | ~350 MS      | ~400 MS      |
+| 400MB .exe | ~2.4 Seconds | ~2.8 Seconds |
+| 200MB .exe | ~1.2 Seconds | ~1.2 Seconds |
+| 100MB .exe | ~500 MS      | ~500 MS      |
 
 # How to use:
 ```rust
@@ -24,6 +24,7 @@ use atom::*;
 async fn main() {
     set_algorithm(atom::Algorithms::ZSTD).unwrap();
     set_password("testpassword").unwrap();
+    set_zstd_compression_level(10).unwrap();
 
     add_data_block(vec!["test.txt" /* ... */], "test", false).await.unwrap();
     remove_data_block(vec!["test.txt" /* ... */], "test").await.unwrap();

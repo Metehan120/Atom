@@ -43,6 +43,7 @@ pub enum Errors {
 
 static PASSWORD: LazyLock<RwLock<String>> = LazyLock::new(|| RwLock::new(String::new()));
 static ALGORITHM: LazyLock<RwLock<Algorithms>> = LazyLock::new(|| RwLock::new(Algorithms::ZSTD));
+static COMPRESSION_LEVEL: LazyLock<RwLock<u8>> = LazyLock::new(|| RwLock::new(5));
 
 pub fn set_algorithm(new_algorithm: Algorithms) -> Result<(), Errors> {
     let mut algorithm_guard = ALGORITHM.write().map_err(|e| Errors::RwLockError(e.to_string()))?;
@@ -68,12 +69,31 @@ fn get_password() -> Result<String, Errors> {
     Ok(password_guard.clone())
 }
 
+pub fn set_zstd_compression_level(level: u8) -> Result<(), Errors> {
+    let mut compression_level = COMPRESSION_LEVEL.write().map_err(|e|
+        Errors::RwLockError(e.to_string())
+    )?;
+    *compression_level = level.into();
+
+    Ok(())
+}
+
+fn get_zstd_compression_level() -> Result<u8, Errors> {
+    let compression_level = COMPRESSION_LEVEL.read().map_err(|e|
+        Errors::RwLockError(e.to_string())
+    )?;
+    Ok(compression_level.clone())
+}
+
 fn compress(content: Vec<u8>) -> Result<Vec<u8>, Errors> {
     let compressed_data = match get_algorithm()? {
         Algorithms::LZ4 => lz4_flex::compress_prepend_size(&content),
         Algorithms::ZSTD =>
             zstd
-                ::encode_all(content.as_slice(), 0)
+                ::encode_all(
+                    content.as_slice(),
+                    get_zstd_compression_level().unwrap_or_else(|e| panic!("Error: {}", e)) as i32
+                )
                 .map_err(|e| Errors::CompressionError(e.to_string()))?,
     };
     Ok(compressed_data)
