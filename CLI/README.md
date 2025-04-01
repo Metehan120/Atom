@@ -10,26 +10,11 @@
 2. Atom using LZ4 & ZSTD because of that you should able switch between Speed and Efficiency.
 
 # Benchmarks (Without Encryption):
-| Algorithms | LZ4          | ZSTD (0)     |
+| Algorithms | LZ4 (0)      | ZSTD         |
 |------------|--------------|--------------|
 | 400MB .exe | ~2.4 Seconds | ~2.8 Seconds |
 | 200MB .exe | ~1.2 Seconds | ~1.2 Seconds |
 | 100MB .exe | ~500 MS      | ~500 MS      |
-
-## How to use CLI:
-1. -c, --archive <archive>                Set the archive file
-2. -a, --add <FILES>...                   Add files to the Files
-3. -r, --remove <FILES>...                Remove files from the Files
-4. -u, --update_files <FILES>...          Update the data block of the Files
-5. -x, --extract <FILES>...               Extract files from the Files
-6. -e, --encrypt <encrypt>                Encrypt the Files [default: false]
-7. -p, --password <password>              Set the password for the Files
-8. -A, --algorithm <zstd // lz4)        Set the algorithm for the Files
-9. -C, --compression <compression_level>  Set the compression level for the Files
-10. -l, --list                             List the files in the archive
-11. -n, --new                              Creates archive file
-12. -h, --help                             Print help
-13. -V, --version                          Print version
 
 # How to use:
 ```rust
