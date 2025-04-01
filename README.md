@@ -1,9 +1,9 @@
 # Atom
 
-## What Atom?:
+## What is Atom?:
 1. Atom is a File Archive like Rar & Zip but its making something different: Instead of searhing through whole Archive Atom is just finding sepcific File and working on it.
 2. Atom using Rayon & Tokio to make thing Parallel and Async because of this the performance impact is significant.
-3. Atom is an just Rust Library for now, soon CLI and GUI will be added.
+3. Atom is an just Rust Library and CLI only for now, soon GUI will be added.
 
 ## Why Atom?:
 1. As I mentioned before Atom using full potentionel of CPU, because of that Atom way faster.
