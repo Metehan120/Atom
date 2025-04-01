@@ -30,6 +30,7 @@
 11. -n, --new                              Creates archive file
 12. -h, --help                             Print help
 13. -V, --version                          Print version
+14. NOT: -e only needed for -a and -u
 
 # How to use:
 ```rust
