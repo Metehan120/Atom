@@ -30,7 +30,8 @@
 11. -n, --new                              Creates archive file
 12. -h, --help                             Print help
 13. -V, --version                          Print version
-14. NOT: -e only needed for -a and -u
+14.  -N, --name-mapping                    Sets name mapping on/off (Name mapping is bad for security if added to command setting mapping off)
+15. NOT: -e only needed for -a and -u
 
 # How to use:
 ```rust
