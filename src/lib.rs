@@ -74,6 +74,7 @@ pub enum Errors {
 static PASSWORD: LazyLock<RwLock<String>> = LazyLock::new(|| RwLock::new(String::new()));
 static ALGORITHM: LazyLock<RwLock<Algorithms>> = LazyLock::new(|| RwLock::new(Algorithms::ZSTD));
 static COMPRESSION_LEVEL: LazyLock<RwLock<u8>> = LazyLock::new(|| RwLock::new(5));
+static NAME_MAPPING: LazyLock<RwLock<bool>> = LazyLock::new(|| RwLock::new(true));
 
 pub fn set_algorithm(new_algorithm: Algorithms) -> Result<(), Errors> {
     let mut algorithm_guard = ALGORITHM
@@ -121,6 +122,22 @@ fn get_zstd_compression_level() -> Result<u8, Errors> {
         .read()
         .map_err(|e| Errors::RwLockError(e.to_string()))?;
     Ok(compression_level.clone())
+}
+
+pub fn set_name_mapping(activate: bool) -> Result<(), Errors> {
+    let mut name_guard = NAME_MAPPING
+        .write()
+        .map_err(|e| Errors::RwLockError(e.to_string()))?;
+    *name_guard = activate;
+
+    Ok(())
+}
+
+fn get_name_mapping() -> Result<bool, Errors> {
+    let name_guard = NAME_MAPPING
+        .read()
+        .map_err(|e| Errors::RwLockError(e.to_string()))?;
+    Ok(name_guard.clone())
 }
 
 fn compress(content: Vec<u8>) -> Result<Vec<u8>, Errors> {
@@ -182,6 +199,32 @@ fn aes_decryption(data: Vec<u8>, nonce_bytes: Vec<u8>) -> Result<Vec<u8>, Errors
         .map_err(|e| Errors::AesDecryptionError(e.to_string()))
 }
 
+fn encrypt_file_name(
+    data: Vec<u8>,
+    nonce: &[u8],
+    pwd: &[u8],
+) -> std::result::Result<Vec<u8>, Errors> {
+    let key = Key::<aes_gcm::Aes256Gcm>::from_slice(&pwd);
+    let cipher = aes_gcm::Aes256Gcm::new(key);
+    let nonce = aes_gcm::Nonce::from_slice(nonce);
+
+    let out = cipher
+        .encrypt(nonce, data.as_ref())
+        .map_err(|e| Errors::AesEncryptionError(e.to_string()))?;
+
+    Ok(out)
+}
+
+fn decrypt_file_name(data: &[u8], nonce_bytes: &[u8], pwd: &[u8]) -> Result<Vec<u8>, Errors> {
+    let key = Key::<aes_gcm::Aes256Gcm>::from_slice(&pwd);
+    let cipher = aes_gcm::Aes256Gcm::new(&key);
+    let nonce = aes_gcm::Nonce::from_slice(nonce_bytes);
+
+    cipher
+        .decrypt(nonce, data)
+        .map_err(|e| Errors::AesDecryptionError(e.to_string()))
+}
+
 pub fn initialize(database_file_name: &str) -> Result<(), Errors> {
     let mut file = match std::fs::File::open(database_file_name) {
         Ok(file) => file,
@@ -189,11 +232,8 @@ pub fn initialize(database_file_name: &str) -> Result<(), Errors> {
             .map_err(|e| Errors::FileIOError(e.to_string()))?,
     };
 
-    file.write_all(
-        format!("ATOM: 0X1B4;STD-FEATURE: THREAD-PARALLEL;DATA-BASE-NAME: {database_file_name};\n")
-            .as_bytes(),
-    )
-    .map_err(|e| Errors::FileIOError(e.to_string()))?;
+    file.write_all(format!("ATOM: 0X1B4;STD-FEATURE: THREAD-PARALLEL;\n").as_bytes())
+        .map_err(|e| Errors::FileIOError(e.to_string()))?;
 
     Ok(())
 }
@@ -212,7 +252,7 @@ pub async fn find_data_block(line_to_find: &[u8], content: Vec<u8>) -> Result<Ve
                     .iter()
                     .fold(0usize, |acc, &b| acc * 10 + ((b - b'0') as usize));
                 let value_start = start_index + pipe_index + 1;
-                let len = std::cmp::min(len, content.len() - value_start);
+                let len = std::cmp::min(len, content.len().saturating_sub(value_start));
                 if value_start + len <= content.len() {
                     return content[value_start..value_start + len].to_vec();
                 }
@@ -349,29 +389,42 @@ pub async fn remove_data_block(
     database_file_name: &str,
 ) -> Result<(), Errors> {
     let remove_entry = |entry_name: &str, file_data: &mut Vec<u8>| {
+        let mut search_pattern = b"MAP: ".to_vec();
+        search_pattern.extend_from_slice(entry_name.as_bytes());
+        search_pattern.extend_from_slice(b" = ");
+
+        if let Some(start) = memchr::memmem::find(file_data, &search_pattern) {
+            if let Some(end_offset) = memchr::memchr(b';', &file_data[start..]) {
+                let end = start + end_offset;
+
+                file_data.par_drain(start..=end);
+            }
+        }
+
         let mut search_pattern = Vec::from(entry_name.as_bytes());
         search_pattern.extend_from_slice(&[b':', b' ']);
 
         if let Some(start) = memchr::memmem::find(file_data, &search_pattern) {
             let start_index = start + search_pattern.len();
 
-            if let Some(pipe_index) = file_data[start_index..].iter().position(|&b| b == b'|') {
-                let len_bytes = &file_data[start_index..start_index + pipe_index];
+            if let Some(pipe_offset) = memchr::memchr(b'|', &file_data[start_index..]) {
+                let pipe_index = start_index + pipe_offset;
+                let len_bytes = &file_data[start_index..pipe_index];
+
                 let len = len_bytes
                     .iter()
                     .fold(0usize, |acc, &b| acc * 10 + ((b - b'0') as usize));
-                let value_start = start_index + pipe_index + 1;
+
+                let value_start = pipe_index + 1;
                 let value_end = value_start + len;
 
                 if value_end < file_data.len() {
-                    // finds the end value
-                    let end = file_data[value_end..]
-                        .iter()
-                        .position(|&b| b == b';')
-                        .map(|e| value_end + e)
-                        .unwrap_or(file_data.len());
-
-                    file_data.par_drain(start..=end);
+                    if let Some(semicolon_offset) = memchr::memchr(b';', &file_data[value_end..]) {
+                        let end = value_end + semicolon_offset;
+                        file_data.par_drain(start..=end);
+                    } else {
+                        file_data.par_drain(start..file_data.len());
+                    }
                 }
             }
         }
@@ -483,6 +536,26 @@ pub async fn add_data_block(
                         database_file_data.extend(nonce);
                         database_file_data.extend(b";");
                     }
+
+                    if get_name_mapping().unwrap() {
+                        let hashed = hash_file_name(&i);
+
+                        let hashed_bytes = hashed.as_bytes();
+                        let iv = &hashed_bytes[8..20];
+                        let key = &hashed_bytes[20..52];
+
+                        let encrypted = encrypt_file_name(i.as_bytes().to_vec(), iv, key)
+                            .map_err(|e| Errors::AesEncryptionError(e.to_string()))
+                            .unwrap_or_else(|e| {
+                                eprintln!("Error: {e}");
+                                panic!();
+                            });
+
+                        let map = format!("MAP: {hashed} = ");
+                        database_file_data.extend(map.as_bytes());
+                        database_file_data.extend(encrypted);
+                        database_file_data.extend(b";");
+                    }
                 }
             }
 
@@ -509,6 +582,7 @@ pub async fn update_data_block(
 ) -> Result<(), Errors> {
     remove_data_block(data_file_names.clone(), database_file_name).await?;
     add_data_block(data_file_names, database_file_name, encrypt).await?;
+
     Ok(())
 }
 
@@ -529,4 +603,47 @@ pub async fn export_file(
     }
 
     Ok(())
+}
+
+pub async fn get_file_names(database_file: &str) -> Result<Vec<(String, String)>, Errors> {
+    let mut mappings = Vec::new();
+    let mut start_idx = 0;
+
+    let mut db_data = Vec::new();
+    File::open(database_file)
+        .map_err(|e| Errors::FileIOError(e.to_string()))?
+        .read_to_end(&mut db_data)
+        .map_err(|e| Errors::FileIOError(e.to_string()))?;
+
+    while let Some(map_idx) = memchr::memmem::find(&db_data[start_idx..], b"MAP:") {
+        let real_idx = start_idx + map_idx;
+
+        if let Some(end_idx) = memchr::memchr(b';', &db_data[real_idx..]) {
+            let real_end = real_idx + end_idx;
+
+            let mapping_str = &db_data[real_idx..real_end];
+            if let Some(map_content) = mapping_str.strip_prefix(b"MAP:") {
+                if let Some(eq_idx) = memchr::memchr(b'=', map_content) {
+                    let hash = &map_content[..eq_idx];
+                    let name = &map_content[eq_idx + 2..];
+
+                    let iv = &hash[9..21];
+                    let key = &hash[21..53];
+                    let decrypted_name = decrypt_file_name(name, iv, key)
+                        .map_err(|e| Errors::AesDecryptionError(e.to_string()));
+
+                    mappings.push((
+                        String::from_utf8_lossy(hash).trim().to_string(),
+                        String::from_utf8_lossy(&decrypted_name?).trim().to_string(),
+                    ));
+                }
+            }
+
+            start_idx = real_end + 1;
+        } else {
+            break;
+        }
+    }
+
+    Ok(mappings)
 }

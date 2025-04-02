@@ -1,7 +1,5 @@
 use atom_cli::*;
-use clap::{Arg, Command};
-use memchr::memchr;
-use std::{fs::File, io::Read};
+use clap::{Arg, Command, value_parser};
 
 #[tokio::main]
 async fn main() {
@@ -29,7 +27,7 @@ async fn main() {
                 .required(false)
                 .num_args(1..),
             Arg::new("update_data_block")
-                .long("update_files")
+                .long("update-files")
                 .short('u')
                 .help("Update the data block of the Files")
                 .value_name("FILES")
@@ -61,6 +59,7 @@ async fn main() {
             Arg::new("compression_level")
                 .long("compression")
                 .short('C')
+                .value_parser(value_parser!(u8))
                 .help("Set the compression level for the Files")
                 .required(false),
             Arg::new("list")
@@ -72,6 +71,11 @@ async fn main() {
                 .long("new")
                 .short('n')
                 .help("Creates archive file")
+                .action(clap::ArgAction::SetTrue),
+            Arg::new("name-mapping")
+                .long("name-mapping")
+                .short('N')
+                .help("Sets name mapping on/off (Name mapping is bad for security if added to command setting mapping off)")
                 .action(clap::ArgAction::SetTrue),
         ]);
 
@@ -86,6 +90,11 @@ async fn main() {
     if let Some(password) = matches.get_one::<String>("password") {
         let password = password.as_str();
         set_password(password).unwrap();
+    }
+
+    if matches.get_flag("name-mapping") {
+        println!("Name mapping is disabled for the files you're adding");
+        set_name_mapping(false).unwrap();
     }
 
     if let Some(algorithm) = matches.get_one::<String>("algorithm_set") {
@@ -154,52 +163,12 @@ async fn main() {
             .await
             .unwrap_or_else(|e| panic!("Error: {e}"));
     } else if matches.get_flag("list") {
-        let mut file = File::open(archive).unwrap_or_else(|e| panic!("Error: {e}"));
-
-        let mut data = Vec::new();
-        file.read_to_end(&mut data)
+        let mappings = get_file_names(archive)
+            .await
             .unwrap_or_else(|e| panic!("Error: {e}"));
 
-        println!("Archive Includes (All names are hashed): ");
-
-        let mut offset = 0;
-        while offset < data.len() {
-            let colon_rel = match memchr(b':', &data[offset..]) {
-                Some(pos) => pos,
-                None => break,
-            };
-            let colon_pos = offset + colon_rel;
-
-            let pipe_rel = match memchr(b'|', &data[colon_pos..]) {
-                Some(pos) => pos,
-                None => break,
-            };
-            let pipe_pos = colon_pos + pipe_rel;
-
-            let hash = &data[offset..colon_pos];
-            let hash_str = String::from_utf8_lossy(hash);
-
-            let len_bytes = &data[colon_pos + 1..pipe_pos];
-            let mut len_value = 0;
-
-            let mut i = 0;
-            while i < len_bytes.len() && (len_bytes[i] == b' ' || len_bytes[i] == b'\t') {
-                i += 1;
-            }
-
-            // Sonra sayıları oku
-            while i < len_bytes.len() && len_bytes[i] >= b'0' && len_bytes[i] <= b'9' {
-                len_value = len_value * 10 + (len_bytes[i] - b'0') as usize;
-                i += 1;
-            }
-
-            println!("- {} ({} bayt)", hash_str, len_value);
-
-            offset = pipe_pos + 1 + len_value;
-
-            if offset < data.len() && data[offset] == b';' {
-                offset += 1;
-            }
+        for (hash, name) in mappings {
+            println!("{} => {}", hash, name);
         }
     } else {
         initialize(archive).unwrap_or_else(|e| panic!("Error: {e}"));
