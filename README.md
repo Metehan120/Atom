@@ -12,9 +12,9 @@
 # Benchmarks (Without Encryption):
 | Algorithms | LZ4          | ZSTD (0)     |
 |------------|--------------|--------------|
-| 400MB .exe | ~2.4 Seconds | ~2.8 Seconds |
-| 200MB .exe | ~1.2 Seconds | ~1.2 Seconds |
-| 100MB .exe | ~500 MS      | ~500 MS      |
+| 400MB .exe | ~1.5 Seconds | ~2 Seconds   |
+| 200MB .exe | ~700 MS      | ~1 Seconds   |
+| 100MB .exe | ~250 MS      | ~500 MS      |
 
 ## How to use CLI:
 1. -c, --archive <archive>                Set the archive file
