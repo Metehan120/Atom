@@ -9,12 +9,19 @@
 1. As I mentioned before Atom using full potentionel of CPU, because of that Atom way faster.
 2. Atom using LZ4 & ZSTD because of that you should able switch between Speed and Efficiency.
 
-# Compression Benchmarks (Not Decomperssion and Without Encryption):
+# Compression Benchmarks (Without Encryption):
 | Algorithms | LZ4          | ZSTD (0)     |
 |------------|--------------|--------------|
 | 400MB .exe | ~1.5 Seconds | ~2 Seconds   |
 | 200MB .exe | ~700 MS      | ~1 Seconds   |
 | 100MB .exe | ~250 MS      | ~500 MS      |
+
+# Decompression Benchmarks (Without Encryption):
+| Algorithms | LZ4          | ZSTD (0)     |
+|------------|--------------|--------------|
+| 400MB .exe | ~200 MS      | ~800 Seconds |
+| 200MB .exe | ~150 MS      | ~350 MS      |
+| 100MB .exe | ~100 MS      | ~200 MS      |
 
 ## How to use CLI:
 1. -c, --archive <archive>                Set the archive file
