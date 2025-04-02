@@ -44,7 +44,7 @@ async fn main() {
     set_zstd_compression_level(10).unwrap();
     set_name_mapping(false).unwrap();
 
-    let (hash_file_name, file_name) = get_file_names().unwrap(); // only works when mapping enabled
+    let (hash_file_name, file_name) = get_file_names().await.unwrap(); // only works when mapping enabled
     add_data_block(vec!["test.txt" /* ... */], "test", false).await.unwrap();
     remove_data_block(vec!["test.txt" /* ... */], "test").await.unwrap();
     export_file(vec!["test.txt" /* ... */], "test").await.unwrap();
