@@ -19,7 +19,7 @@
 # Decompression Benchmarks (Without Encryption):
 | Algorithms | LZ4          | ZSTD (0)     |
 |------------|--------------|--------------|
-| 400MB .exe | ~200 MS      | ~800 Seconds |
+| 400MB .exe | ~200 MS      | ~800 MS      |
 | 200MB .exe | ~150 MS      | ~350 MS      |
 | 100MB .exe | ~100 MS      | ~200 MS      |
 
