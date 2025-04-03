@@ -1,6 +1,7 @@
-![Static Badge](https://img.shields.io/badge/atom-archive?label=1.2.1&link=https%3A%2F%2Fcrates.io%2Fcrates%2Fatom-archive)
-![Static Badge](https://img.shields.io/badge/atom-archive?label=docs&link=https%3A%2F%2Fdocs.rs%2Fatom-archive%2F)
-![Static Badge](https://img.shields.io/badge/Atom-discord?label=Discord&color=rgb(100%2C100%2C255)&link=https%3A%2F%2Fdiscord.gg%2FFX9bBpBbMw)
+[![Static Badge](https://img.shields.io/badge/Atom-Archive?label=1.2.1)](https://crates.io/crates/atom-archive)
+[![Static Badge](https://img.shields.io/badge/Atom-Archive?label=docs)](https://docs.rs/atom-archive)
+[![Static Badge](https://img.shields.io/badge/Atom-Discord?label=Discord&color=rgb(100%2C100%2C255))](https://discord.gg/FX9bBpBbMw)
+
 
 # Before Switching 1.2.0 -> 1.2.1 you need to extract -> remove -> readd your files to work Name Mapping correctly
 
