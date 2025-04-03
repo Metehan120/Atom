@@ -1,4 +1,5 @@
 # Atom
+# Before Switching 1.2.0 -> 1.2.1 you need to extract -> remove -> readd your files to work Name Mapping correctly
 
 ## What is Atom?:
 1. Atom is a File Archive like Rar & Zip but its making something different: Instead of searhing through whole Archive Atom is just finding sepcific File and working on it.
