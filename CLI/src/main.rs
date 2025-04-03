@@ -163,9 +163,7 @@ async fn main() {
             .await
             .unwrap_or_else(|e| panic!("Error: {e}"));
     } else if matches.get_flag("list") {
-        let mappings = get_file_names(archive)
-            .await
-            .unwrap_or_else(|e| panic!("Error: {e}"));
+        let mappings = get_file_names(archive).await.unwrap();
 
         for (hash, name) in mappings {
             println!("{} => {}", hash, name);

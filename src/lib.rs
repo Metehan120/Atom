@@ -199,32 +199,6 @@ fn aes_decryption(data: Vec<u8>, nonce_bytes: Vec<u8>) -> Result<Vec<u8>, Errors
         .map_err(|e| Errors::AesDecryptionError(e.to_string()))
 }
 
-fn encrypt_file_name(
-    data: Vec<u8>,
-    nonce: &[u8],
-    pwd: &[u8],
-) -> std::result::Result<Vec<u8>, Errors> {
-    let key = Key::<aes_gcm::Aes256Gcm>::from_slice(&pwd);
-    let cipher = aes_gcm::Aes256Gcm::new(key);
-    let nonce = aes_gcm::Nonce::from_slice(nonce);
-
-    let out = cipher
-        .encrypt(nonce, data.as_ref())
-        .map_err(|e| Errors::AesEncryptionError(e.to_string()))?;
-
-    Ok(out)
-}
-
-fn decrypt_file_name(data: &[u8], nonce_bytes: &[u8], pwd: &[u8]) -> Result<Vec<u8>, Errors> {
-    let key = Key::<aes_gcm::Aes256Gcm>::from_slice(&pwd);
-    let cipher = aes_gcm::Aes256Gcm::new(&key);
-    let nonce = aes_gcm::Nonce::from_slice(nonce_bytes);
-
-    cipher
-        .decrypt(nonce, data)
-        .map_err(|e| Errors::AesDecryptionError(e.to_string()))
-}
-
 pub fn initialize(database_file_name: &str) -> Result<(), Errors> {
     let mut file = match std::fs::File::open(database_file_name) {
         Ok(file) => file,
@@ -540,16 +514,7 @@ pub async fn add_data_block(
                     if get_name_mapping().unwrap() {
                         let hashed = hash_file_name(&i);
 
-                        let hashed_bytes = hashed.as_bytes();
-                        let iv = &hashed_bytes[8..20];
-                        let key = &hashed_bytes[20..52];
-
-                        let encrypted = encrypt_file_name(i.as_bytes().to_vec(), iv, key)
-                            .map_err(|e| Errors::AesEncryptionError(e.to_string()))
-                            .unwrap_or_else(|e| {
-                                eprintln!("Error: {e}");
-                                panic!();
-                            });
+                        let encrypted = xor_encrypt_decrypt(&i.as_bytes(), hashed.as_bytes());
 
                         let map = format!("MAP: {hashed} = ");
                         database_file_data.extend(map.as_bytes());
@@ -624,17 +589,14 @@ pub async fn get_file_names(database_file: &str) -> Result<Vec<(String, String)>
             let mapping_str = &db_data[real_idx..real_end];
             if let Some(map_content) = mapping_str.strip_prefix(b"MAP:") {
                 if let Some(eq_idx) = memchr::memchr(b'=', map_content) {
-                    let hash = &map_content[..eq_idx];
+                    let hash = &map_content[1..eq_idx - 1];
                     let name = &map_content[eq_idx + 2..];
 
-                    let iv = &hash[9..21];
-                    let key = &hash[21..53];
-                    let decrypted_name = decrypt_file_name(name, iv, key)
-                        .map_err(|e| Errors::AesDecryptionError(e.to_string()));
+                    let decrypted_name = xor_encrypt_decrypt(name, hash);
 
                     mappings.push((
                         String::from_utf8_lossy(hash).trim().to_string(),
-                        String::from_utf8_lossy(&decrypted_name?).trim().to_string(),
+                        String::from_utf8_lossy(&decrypted_name).trim().to_string(),
                     ));
                 }
             }
@@ -646,4 +608,11 @@ pub async fn get_file_names(database_file: &str) -> Result<Vec<(String, String)>
     }
 
     Ok(mappings)
+}
+
+fn xor_encrypt_decrypt(data: &[u8], key: &[u8]) -> Vec<u8> {
+    data.iter()
+        .enumerate()
+        .map(|(i, b)| b ^ key[i % key.len()])
+        .collect()
 }
