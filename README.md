@@ -37,7 +37,7 @@
 5.  -x, --extract <FILES>... -> Extract files from the Files
 6.  -e, --encrypt Encrypt the Files
 7.  -p, --password <password> -> Set the password for the Files
-8.  -A, --algorithm <algorithm_set> -> Set the algorithm for the Files
+8.  -A, --algorithm <algorithm_set> -> Set the algorithm for the Files (Compression Alghorithm's: "lz4/zstd")
 10.  -C, --compression <compression_level> -> Set the compression level for the Files
 11.  -l, --list -> List the files in the archive
 12.  -n, --new -> Creates archive file
