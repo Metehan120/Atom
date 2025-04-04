@@ -12,11 +12,21 @@ use std::{
     sync::Arc,
 };
 use thiserror::Error;
+use utils::atomcrpyt;
+mod utils {
+    pub mod atomcrpyt;
+}
 
 #[derive(Clone)]
 pub enum Algorithms {
     LZ4,
     ZSTD,
+}
+
+#[derive(Clone)]
+pub enum EncriptionAlgorithms {
+    AES,
+    ATOM,
 }
 
 #[derive(Error, Debug)]
@@ -75,6 +85,8 @@ static PASSWORD: LazyLock<RwLock<String>> = LazyLock::new(|| RwLock::new(String:
 static ALGORITHM: LazyLock<RwLock<Algorithms>> = LazyLock::new(|| RwLock::new(Algorithms::ZSTD));
 static COMPRESSION_LEVEL: LazyLock<RwLock<u8>> = LazyLock::new(|| RwLock::new(5));
 static NAME_MAPPING: LazyLock<RwLock<bool>> = LazyLock::new(|| RwLock::new(true));
+static ECNRYPTION_ALGORITHM: LazyLock<RwLock<EncriptionAlgorithms>> =
+    LazyLock::new(|| RwLock::new(EncriptionAlgorithms::AES));
 
 pub fn set_algorithm(new_algorithm: Algorithms) -> Result<(), Errors> {
     let mut algorithm_guard = ALGORITHM
@@ -89,6 +101,23 @@ fn get_algorithm() -> Result<Algorithms, Errors> {
     let algorithm_guard = ALGORITHM
         .read()
         .map_err(|e| Errors::RwLockError(e.to_string()))?;
+    Ok(algorithm_guard.clone())
+}
+
+pub fn set_encryption_algorithm(new_algorithm: EncriptionAlgorithms) -> Result<(), Errors> {
+    let mut algorithm_guard = ECNRYPTION_ALGORITHM
+        .write()
+        .map_err(|e| Errors::RwLockError(e.to_string()))?;
+    *algorithm_guard = new_algorithm;
+
+    Ok(())
+}
+
+fn get_encryption_algorithm() -> Result<EncriptionAlgorithms, Errors> {
+    let algorithm_guard = ECNRYPTION_ALGORITHM
+        .read()
+        .map_err(|e| Errors::RwLockError(e.to_string()))?;
+
     Ok(algorithm_guard.clone())
 }
 
@@ -175,28 +204,51 @@ fn hash_key(input: &str) -> [u8; 32] {
     key
 }
 
-fn aes_encryption(data: Vec<u8>) -> std::result::Result<(Vec<u8>, Vec<u8>), Errors> {
-    let key = hash_key(get_password()?.as_str());
-    let key = Key::<aes_gcm::Aes256Gcm>::from_slice(&key);
-    let cipher = aes_gcm::Aes256Gcm::new(key);
-    let nonce = aes_gcm::Aes256Gcm::generate_nonce(&mut OsRng);
+fn encryption(data: Vec<u8>) -> std::result::Result<(Vec<u8>, Vec<u8>), Errors> {
+    match get_encryption_algorithm().unwrap() {
+        EncriptionAlgorithms::AES => {
+            let key = hash_key(get_password()?.as_str());
+            let key = Key::<aes_gcm::Aes256Gcm>::from_slice(&key);
+            let cipher = aes_gcm::Aes256Gcm::new(key);
+            let nonce = aes_gcm::Aes256Gcm::generate_nonce(&mut OsRng);
 
-    let out = cipher
-        .encrypt(&nonce, data.as_ref())
-        .map_err(|e| Errors::AesEncryptionError(e.to_string()))?;
+            let out = cipher
+                .encrypt(&nonce, data.as_ref())
+                .map_err(|e| Errors::AesEncryptionError(e.to_string()))?;
 
-    Ok((out, nonce.to_vec()))
+            Ok((out, nonce.to_vec()))
+        }
+        EncriptionAlgorithms::ATOM => {
+            let nonce = atomcrpyt::nonce();
+            let password = get_password()?;
+            let pwd = password.as_str();
+            let out = atomcrpyt::encrpyt(pwd, &data, &nonce);
+
+            Ok((out, nonce.to_vec()))
+        }
+    }
 }
 
-fn aes_decryption(data: Vec<u8>, nonce_bytes: Vec<u8>) -> Result<Vec<u8>, Errors> {
-    let key_hash = hash_key(get_password()?.as_str());
-    let key = Key::<aes_gcm::Aes256Gcm>::from_slice(&key_hash);
-    let cipher = aes_gcm::Aes256Gcm::new(&key);
-    let nonce = aes_gcm::Nonce::from_slice(nonce_bytes.as_slice());
+fn decryption(data: Vec<u8>, nonce_bytes: Vec<u8>) -> Result<Vec<u8>, Errors> {
+    match get_encryption_algorithm().unwrap() {
+        EncriptionAlgorithms::AES => {
+            let key_hash = hash_key(get_password()?.as_str());
+            let key = Key::<aes_gcm::Aes256Gcm>::from_slice(&key_hash);
+            let cipher = aes_gcm::Aes256Gcm::new(&key);
+            let nonce = aes_gcm::Nonce::from_slice(nonce_bytes.as_slice());
 
-    cipher
-        .decrypt(nonce, &*data)
-        .map_err(|e| Errors::AesDecryptionError(e.to_string()))
+            cipher
+                .decrypt(nonce, &*data)
+                .map_err(|e| Errors::AesDecryptionError(e.to_string()))
+        }
+        EncriptionAlgorithms::ATOM => {
+            let password = get_password()?;
+            let pwd = password.as_str();
+            let decrypted_data = atomcrpyt::decrpyt(pwd, &data, &nonce_bytes);
+
+            Ok(decrypted_data)
+        }
+    }
 }
 
 pub fn initialize(database_file_name: &str) -> Result<(), Errors> {
@@ -264,7 +316,7 @@ pub async fn read_data_block(data_file_name: &str, database_file: &str) -> Resul
                 find_data_block(data_file_name.as_bytes(), (*database_data_vector).clone()).await;
             let decrypted_data = tokio::task::spawn_blocking(move || match (file_data, nonce) {
                 (Ok(file_data), Ok(nonce)) => {
-                    aes_decryption(file_data, nonce).unwrap_or_else(|e| panic!("Error: {}", e))
+                    decryption(file_data, nonce).unwrap_or_else(|e| panic!("Error: {}", e))
                 }
                 _ => Vec::new(),
             })
@@ -325,8 +377,9 @@ pub async fn read_multiple_data_block(
 
                 let decompressed_data = tokio::task::spawn_blocking(move || {
                     let decrypted_data = match (file_data, nonce) {
-                        (Ok(file_data), Ok(nonce)) => aes_decryption(file_data, nonce)
-                            .unwrap_or_else(|e| panic!("Error: {}", e)),
+                        (Ok(file_data), Ok(nonce)) => {
+                            decryption(file_data, nonce).unwrap_or_else(|e| panic!("Error: {}", e))
+                        }
                         _ => panic!("Error: Invalid file data or nonce"),
                     };
                     decompress(decrypted_data)
@@ -477,7 +530,7 @@ pub async fn add_data_block(
 
                 let (data, nonce) = match encrypt {
                     true => {
-                        let compressed = aes_encryption(
+                        let compressed = encryption(
                             compress(data_file_vector_data)
                                 .map_err(|e| Errors::CompressionError(e.to_string()))
                                 .unwrap_or_else(|e| panic!("Error: {}", e)),

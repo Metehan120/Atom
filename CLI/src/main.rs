@@ -45,7 +45,7 @@ async fn main() {
                 .short('e')
                 .help("Encrypt the Files")
                 .required(false)
-                .default_value("false"),
+                .action(clap::ArgAction::SetTrue),
             Arg::new("password")
                 .long("password")
                 .short('p')
@@ -77,15 +77,17 @@ async fn main() {
                 .short('N')
                 .help("Sets name mapping on/off (Name mapping is bad for security if added to command setting mapping off)")
                 .action(clap::ArgAction::SetTrue),
+            Arg::new("atomcrpyte")
+                .long("name-mapping")
+                .short('P')
+                .help("Sets name AtomCrypte on/off (*EXPERIMENTAL*)")
+                .action(clap::ArgAction::SetTrue),
         ]);
 
     let matches = command.get_matches();
     let archive = matches.get_one::<String>("archive").unwrap().as_str();
-    let encrypt = matches
-        .get_one::<String>("encrypt")
-        .unwrap()
-        .parse::<bool>()
-        .unwrap();
+
+    let encrypt = matches.get_flag("encrypt");
 
     if let Some(password) = matches.get_one::<String>("password") {
         let password = password.as_str();
@@ -95,6 +97,13 @@ async fn main() {
     if matches.get_flag("name-mapping") {
         println!("Name mapping is disabled for the files you're adding");
         set_name_mapping(false).unwrap();
+    }
+
+    if matches.get_flag("atomcrpyte") {
+        println!(
+            "⚠️ AtomCrypte is extremely fast on small files, but *NOT RECOMMENDED FOR PRODUCTION USE* – potential security weaknesses exist."
+        );
+        set_encryption_algorithm(EncriptionAlgorithms::ATOM).unwrap();
     }
 
     if let Some(algorithm) = matches.get_one::<String>("algorithm_set") {
