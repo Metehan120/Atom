@@ -79,7 +79,7 @@ async fn main() {
 ## ✅ When you should use Atom:
 1. ✅ Archiving large groups of small/medium files/large files (200MB+)
 2. ✅ Protecting archives with AES-256-GCM
-3. ✅ When you want parallel + async + Rust performance ⚡
+3. ✅ When you want parallel + async + Rust performance
 
 ## 🧪 Wanna try AtomCrypte?
 1. CLI (***EXPERIMENTAL USE ONLY***):
