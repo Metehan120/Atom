@@ -39,14 +39,6 @@ const IN_S_BOX: [u8; 256] = [
     0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d,
 ];
 
-fn generate_inv_s_box(s_box: &[u8; 256]) -> [u8; 256] {
-    let mut inv_s_box = [0u8; 256];
-    for (i, &val) in s_box.iter().enumerate() {
-        inv_s_box[val as usize] = i as u8;
-    }
-    inv_s_box
-}
-
 pub fn nonce() -> [u8; 32] {
     let mut nonce = [0u8; 32];
     OsRng.try_fill_bytes(&mut nonce).unwrap();
