@@ -42,7 +42,7 @@
 11.  -l, --list -> List the files in the archive
 12.  -n, --new -> Creates archive file
 13.  -N, --name-mapping -> Sets name mapping off (***Increases Security***)
-14.  -P, --atomcrypte -> Sets name AtomCrypte on/off (***EXPERIMENTAL***)
+14.  -P, --atomcrypte -> Sets AtomCrypte on/off (***EXPERIMENTAL***)
 15.  -h, --help -> Print help
 16.  -V, --version -> Print version
 
