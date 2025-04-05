@@ -1,0 +1,10 @@
+[package]
+name = "AtomCrpyte"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rand = "0.9"
+blake3 = "1.8"
+rayon = "1"
+subtle = "2.6"
