@@ -219,10 +219,14 @@ fn encryption(data: Vec<u8>) -> std::result::Result<(Vec<u8>, Vec<u8>), Errors> 
             Ok((out, nonce.to_vec()))
         }
         EncryptionAlgorithms::ATOM => {
-            let nonce = atomcrpyt::nonce();
+            let nonce = atomcrpyt::nonce().map_err(|e| {
+                Errors::InvalidNonce(format!("Nonce generation failed: {}", e.to_string()))
+            })?;
             let password = get_password()?;
             let pwd = password.as_str();
-            let out = atomcrpyt::encrpyt(pwd, &data, &nonce);
+            let out = atomcrpyt::encrpyt(pwd, &data, &nonce).map_err(|e| {
+                Errors::InvalidData(format!("Encryption failed: {}", e.to_string()))
+            })?;
 
             Ok((out, nonce.to_vec()))
         }
@@ -244,7 +248,9 @@ fn decryption(data: Vec<u8>, nonce_bytes: Vec<u8>) -> Result<Vec<u8>, Errors> {
         EncryptionAlgorithms::ATOM => {
             let password = get_password()?;
             let pwd = password.as_str();
-            let decrypted_data = atomcrpyt::decrpyt(pwd, &data, &nonce_bytes);
+            let decrypted_data = atomcrpyt::decrpyt(pwd, &data, &nonce_bytes).map_err(|e| {
+                Errors::InvalidData(format!("Decryption failed: {}", e.to_string()))
+            })?;
 
             Ok(decrypted_data)
         }
