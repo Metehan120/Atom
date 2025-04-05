@@ -1,4 +1,8 @@
-## 🧭 Use Cases
+## Security Model:
+- AtomCrypte is designed with a layered defense approach combining entropy-dense chunking, dynamic S-boxes, non-linear mixing, and constant-time MAC validation.
+It's built for brute-force resistance and high-level data obfuscation while remaining fully deterministic and reversible under valid conditions.
+
+## Use Cases
 
 AtomCrypte is designed for scenarios where standard encryption isn't enough, and you need a multi-layered cryptographic defense mechanism built with flexibility, chaos, and paranoia in mind.
 
@@ -11,7 +15,7 @@ This algorithm is currently in development and has **not undergone formal crypto
 - 🚫 Not Suitable for Real-Time Use (Yet)  
 Due to its computational complexity and chunk-heavy structure, AtomCrypte is **not designed for low-latency or real-time environments** (e.g., video streaming, VoIP).
 
-# ⚛️ How AtomCrpyte works?
+# How AtomCrpyte works?
 
 ## Math Behind XOR Funtions:
 1. xor_encrypt Function: ``C[i] = ((P[i] ⊕ (N[i % len(N)] ⊕ K[i % len(K)])) <<< rot) + N[i % len(N)] + K[i % len(K)]``
