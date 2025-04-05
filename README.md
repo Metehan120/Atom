@@ -85,5 +85,6 @@ async fn main() {
 1. CLI (***EXPERIMENTAL USE ONLY***):
 - ``atom -c archive.atom -a myfile.txt -e -p "supersecret" -P``
 2. Code (***EXPERIMENTAL USE ONLY***):
+
 - ```rust
     set_encryption_algorithm(atom::EncryptionAlgorithms::ATOM)
