@@ -1,6 +1,7 @@
 use blake3::derive_key;
 use rand::{TryRngCore, rngs::OsRng};
 use rayon::prelude::*;
+use subtle::ConstantTimeEq;
 
 pub fn nonce() -> [u8; 32] {
     let mut nonce = [0u8; 32];
@@ -9,13 +10,43 @@ pub fn nonce() -> [u8; 32] {
     *blake3::hash(&nonce).as_bytes()
 }
 
-fn xor_encrypt_decrypt(nonce: &[u8], pwd: &[u8], input: &[u8]) -> Vec<u8> {
+fn xor_encrypt(nonce: &[u8], pwd: &[u8], input: &[u8]) -> Vec<u8> {
     let pwd = encrypt_password(&pwd, nonce);
 
     let out = input
         .par_iter()
         .enumerate()
-        .map(|(i, b)| b ^ (nonce[i % nonce.len()] ^ pwd[i % pwd.len()]))
+        .map(|(i, b)| {
+            let masked = b ^ (nonce[i % nonce.len()] ^ pwd[i % pwd.len()]);
+            let mut masked = masked.rotate_left((nonce[i % nonce.len()] % 8) as u32);
+
+            masked = masked.wrapping_add(nonce[i % nonce.len()]);
+            masked = masked.wrapping_add(pwd[i % pwd.len()]);
+
+            masked
+        })
+        .collect::<Vec<u8>>();
+
+    match out.is_empty() {
+        true => panic!("Empty vector"),
+        false => out,
+    }
+}
+
+fn xor_decrypt(nonce: &[u8], pwd: &[u8], input: &[u8]) -> Vec<u8> {
+    let pwd = encrypt_password(&pwd, nonce);
+
+    let out = input
+        .par_iter()
+        .enumerate()
+        .map(|(i, b)| {
+            let masked = b.wrapping_sub(pwd[i % pwd.len()]);
+            let masked = masked.wrapping_sub(nonce[i % nonce.len()]);
+
+            let masked = masked.rotate_right((nonce[i % nonce.len()] % 8) as u32);
+
+            masked ^ (nonce[i % nonce.len()] ^ pwd[i % pwd.len()])
+        })
         .collect::<Vec<u8>>();
 
     match out.is_empty() {
@@ -29,21 +60,19 @@ fn mix_blocks(data: &mut Vec<u8>, nonce: &[u8]) -> Vec<u8> {
         return data.to_vec();
     }
 
-    for round in 0..=2 {
-        data.par_iter_mut().enumerate().for_each(|(i, byte)| {
+    data.par_iter_mut()
+        .enumerate()
+        .map(|(i, byte)| {
             let n = nonce[i % nonce.len()];
-            match round {
-                0 => *byte = byte.wrapping_add(n),
-                1 => {
-                    *byte = byte.rotate_right(3);
-                    *byte ^= n;
-                }
-                2 => *byte = byte.wrapping_add(n),
-                _ => unreachable!(),
-            }
-        });
-    }
-    data.to_vec()
+            let mut byte = *byte;
+            byte = byte.wrapping_add(n);
+            byte = byte.rotate_right((n % 8) as u32);
+            byte ^= n;
+            byte = byte.wrapping_add(n);
+
+            byte
+        })
+        .collect::<Vec<u8>>()
 }
 
 fn unmix_blocks(data: &mut Vec<u8>, nonce: &[u8]) -> Vec<u8> {
@@ -51,28 +80,25 @@ fn unmix_blocks(data: &mut Vec<u8>, nonce: &[u8]) -> Vec<u8> {
         return data.to_vec();
     }
 
-    for round in (0..=2).rev() {
-        data.par_iter_mut().enumerate().for_each(|(i, byte)| {
+    data.par_iter_mut()
+        .enumerate()
+        .map(|(i, byte)| {
             let n = nonce[i % nonce.len()];
-            match round {
-                2 => *byte = byte.wrapping_sub(n),
-                1 => {
-                    *byte = *byte ^ n;
-                    *byte = byte.rotate_left(3);
-                }
-                0 => *byte = byte.wrapping_sub(n),
-                _ => unreachable!(),
-            }
-        });
-    }
+            let mut byte = *byte;
+            byte = byte.wrapping_sub(n);
+            byte ^= n;
+            byte = byte.rotate_left((n % 8) as u32);
+            byte = byte.wrapping_sub(n);
 
-    data.to_vec()
+            byte
+        })
+        .collect::<Vec<u8>>()
 }
 
 fn encrypt_password(pwd: &[u8], salt: &[u8]) -> Vec<u8> {
     let mut pwd = pwd.to_vec();
 
-    for _x in 0..20 {
+    for _x in 0..100 {
         for round in 0..=3 {
             pwd.par_iter_mut().enumerate().for_each(|(i, byte)| {
                 let n = salt[i % salt.len()];
@@ -230,7 +256,7 @@ pub fn encrpyt(pwd: &str, data: &[u8], nonce: &[u8]) -> Vec<u8> {
     let s_block = generate_dynamic_sbox(nonce, &pwd);
     let mixed_data = mix_blocks(&mut s_bytes(data, &s_block), nonce);
     let mixed_data = dynamic_chunk_shift(&mixed_data, nonce);
-    let crypted = xor_encrypt_decrypt(nonce, &pwd, &mixed_data);
+    let crypted = xor_encrypt(nonce, &pwd, &mixed_data);
 
     let mac = *blake3::keyed_hash(blake3::hash(&crypted).as_bytes(), &data).as_bytes();
 
@@ -252,15 +278,15 @@ pub fn decrpyt(pwd: &str, data: &[u8], nonce: &[u8]) -> Vec<u8> {
 
     let (crypted, mac_key) = data.split_at(total_len - 32);
 
-    let xor_decrypted = xor_encrypt_decrypt(nonce, &pwd, crypted);
+    let xor_decrypted = xor_decrypt(nonce, &pwd, crypted);
     let mut unshifted = dynamic_chunk_unshift(&xor_decrypted, nonce);
     let unmixed = unmix_blocks(&mut unshifted, nonce);
     let decrypted_data = in_s_bytes(&unmixed, nonce, &pwd);
 
     let mac = blake3::keyed_hash(blake3::hash(&crypted).as_bytes(), &decrypted_data);
 
-    if mac.as_bytes() != mac_key {
-        panic!("Invalid MAC");
+    if mac.as_bytes().ct_eq(mac_key).unwrap_u8() != 1 {
+        panic!("Decryption Failed");
     }
 
     decrypted_data
