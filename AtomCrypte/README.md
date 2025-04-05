@@ -1,5 +1,25 @@
 # How AtomCrpyte works?
 
+## 🧭 Use Cases
+
+AtomCrypte is designed for scenarios where standard encryption isn't enough, and you want a multi-layered cryptographic defense system.
+
+🔐 Personal file encryption  
+Ideal for encrypting sensitive documents, notes, or backups that require extra security.
+
+💼 Enterprise-grade secrets  
+A good fit for internal tools, config files, API keys, or vault-style systems where brute-force resistance matters.
+
+📦 Encrypted storage systems  
+Can be integrated into secure storage systems for apps where reversible encryption with layered protection is needed.
+
+🧪 Experimental / academic cryptography  
+Useful as a research-level custom algorithm demonstrating layered cryptographic design.
+
+🚫 Not recommended for real-time communication (yet)  
+Due to heavy CPU usage, AtomCrypte is not optimized for real-time data streams (e.g., VoIP or live chat).
+
+
 ## Math Behind XOR Funtions:
 1. xor_encrypt Function: ``C[i] = ((P[i] ⊕ (N[i % len(N)] ⊕ K[i % len(K)])) <<< rot) + N[i % len(N)] + K[i % len(K)]``
 2. xor_decrypt Funtion: ``P[i] = ((C[i] - K[i % len(K)] - N[i % len(N)]) >>> rot) ⊕ (N[i % len(N)] ⊕ K[i % len(K)])``
