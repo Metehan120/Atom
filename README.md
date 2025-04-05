@@ -1,4 +1,4 @@
-[![Static Badge](https://img.shields.io/badge/Atom-Archive?label=1.2.1)](https://crates.io/crates/atom-archive)
+[![Static Badge](https://img.shields.io/badge/Atom-Archive?label=1.3.3)](https://crates.io/crates/atom-archive)
 [![Static Badge](https://img.shields.io/badge/Atom-Archive?label=docs)](https://docs.rs/atom-archive)
 [![Static Badge](https://img.shields.io/badge/Atom-Discord?label=Discord&color=rgb(100%2C100%2C255))](https://discord.gg/FX9bBpBbMw)
 
