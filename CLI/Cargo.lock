@@ -125,6 +125,7 @@ dependencies = [
  "memchr",
  "rand",
  "rayon",
+ "subtle",
  "thiserror",
  "tokio",
  "zstd",
