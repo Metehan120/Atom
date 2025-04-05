@@ -1,6 +1,6 @@
 [package]
 name = "atom-archive"
-version = "1.3.2"
+version = "1.3.3"
 edition = "2024"
 description = "Atom Fastest Archive Format"
 license = "MIT"
