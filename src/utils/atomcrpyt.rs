@@ -1,3 +1,4 @@
+use blake3::derive_key;
 use rand::{TryRngCore, rngs::OsRng};
 use rayon::prelude::*;
 
@@ -155,20 +156,43 @@ fn in_s_bytes(data: &[u8]) -> Vec<u8> {
 }
 
 pub fn encrpyt(pwd: &str, data: &[u8], nonce: &[u8]) -> Vec<u8> {
-    let pwd = encrpyt_password(pwd.as_bytes(), nonce);
+    let pwd = derive_key(pwd, nonce);
+    let pwd = encrpyt_password(&pwd, nonce);
+    let mut out_vec = Vec::new();
 
-    let data = mix_blocks(&mut s_bytes(data), nonce);
+    let mixed_data = mix_blocks(&mut s_bytes(data), nonce);
+    let crypted = xor_encrypt_decrypt(nonce, &pwd, &mixed_data);
 
-    xor_encrypt_decrypt(nonce, &pwd, &data)
+    let mac = *blake3::keyed_hash(blake3::hash(&crypted).as_bytes(), &data).as_bytes();
+
+    out_vec.extend(crypted.clone());
+    out_vec.extend(mac);
+
+    out_vec
 }
 
 pub fn decrpyt(pwd: &str, data: &[u8], nonce: &[u8]) -> Vec<u8> {
-    let pwd = encrpyt_password(pwd.as_bytes(), nonce);
+    let pwd = derive_key(pwd, nonce);
+    let pwd = encrpyt_password(&pwd, nonce);
 
-    let data = in_s_bytes(&unmix_blocks(
-        &mut xor_encrypt_decrypt(nonce, &pwd, &data),
+    let total_len = data.len();
+
+    if total_len < 32 {
+        panic!("Data too short to contain MAC");
+    }
+
+    let (crypted, mac_key) = data.split_at(total_len - 32);
+
+    let decrypted_data = in_s_bytes(&unmix_blocks(
+        &mut xor_encrypt_decrypt(nonce, &pwd, crypted),
         nonce,
     ));
 
-    data
+    let mac = blake3::keyed_hash(blake3::hash(&crypted).as_bytes(), &decrypted_data);
+
+    if mac.as_bytes() != mac_key {
+        panic!("Invalid MAC");
+    }
+
+    decrypted_data
 }
