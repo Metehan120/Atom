@@ -78,7 +78,7 @@ async fn main() {
                 .help("Sets name mapping on/off (Name mapping is bad for security if added to command setting mapping off)")
                 .action(clap::ArgAction::SetTrue),
             Arg::new("atomcrpyte")
-                .long("name-mapping")
+                .long("atomcrypte")
                 .short('P')
                 .help("Sets name AtomCrypte on/off (*EXPERIMENTAL*)")
                 .action(clap::ArgAction::SetTrue),
@@ -103,7 +103,7 @@ async fn main() {
         println!(
             "⚠️ AtomCrypte is extremely fast on small files, but *NOT RECOMMENDED FOR PRODUCTION USE* – potential security weaknesses exist."
         );
-        set_encryption_algorithm(EncriptionAlgorithms::ATOM).unwrap();
+        set_encryption_algorithm(EncryptionAlgorithms::ATOM).unwrap();
     }
 
     if let Some(algorithm) = matches.get_one::<String>("algorithm_set") {

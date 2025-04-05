@@ -24,7 +24,7 @@ pub enum Algorithms {
 }
 
 #[derive(Clone)]
-pub enum EncriptionAlgorithms {
+pub enum EncryptionAlgorithms {
     AES,
     ATOM,
 }
@@ -85,8 +85,8 @@ static PASSWORD: LazyLock<RwLock<String>> = LazyLock::new(|| RwLock::new(String:
 static ALGORITHM: LazyLock<RwLock<Algorithms>> = LazyLock::new(|| RwLock::new(Algorithms::ZSTD));
 static COMPRESSION_LEVEL: LazyLock<RwLock<u8>> = LazyLock::new(|| RwLock::new(5));
 static NAME_MAPPING: LazyLock<RwLock<bool>> = LazyLock::new(|| RwLock::new(true));
-static ECNRYPTION_ALGORITHM: LazyLock<RwLock<EncriptionAlgorithms>> =
-    LazyLock::new(|| RwLock::new(EncriptionAlgorithms::AES));
+static ECNRYPTION_ALGORITHM: LazyLock<RwLock<EncryptionAlgorithms>> =
+    LazyLock::new(|| RwLock::new(EncryptionAlgorithms::AES));
 
 pub fn set_algorithm(new_algorithm: Algorithms) -> Result<(), Errors> {
     let mut algorithm_guard = ALGORITHM
@@ -104,7 +104,7 @@ fn get_algorithm() -> Result<Algorithms, Errors> {
     Ok(algorithm_guard.clone())
 }
 
-pub fn set_encryption_algorithm(new_algorithm: EncriptionAlgorithms) -> Result<(), Errors> {
+pub fn set_encryption_algorithm(new_algorithm: EncryptionAlgorithms) -> Result<(), Errors> {
     let mut algorithm_guard = ECNRYPTION_ALGORITHM
         .write()
         .map_err(|e| Errors::RwLockError(e.to_string()))?;
@@ -113,7 +113,7 @@ pub fn set_encryption_algorithm(new_algorithm: EncriptionAlgorithms) -> Result<(
     Ok(())
 }
 
-fn get_encryption_algorithm() -> Result<EncriptionAlgorithms, Errors> {
+fn get_encryption_algorithm() -> Result<EncryptionAlgorithms, Errors> {
     let algorithm_guard = ECNRYPTION_ALGORITHM
         .read()
         .map_err(|e| Errors::RwLockError(e.to_string()))?;
@@ -206,7 +206,7 @@ fn hash_key(input: &str) -> [u8; 32] {
 
 fn encryption(data: Vec<u8>) -> std::result::Result<(Vec<u8>, Vec<u8>), Errors> {
     match get_encryption_algorithm().unwrap() {
-        EncriptionAlgorithms::AES => {
+        EncryptionAlgorithms::AES => {
             let key = hash_key(get_password()?.as_str());
             let key = Key::<aes_gcm::Aes256Gcm>::from_slice(&key);
             let cipher = aes_gcm::Aes256Gcm::new(key);
@@ -218,7 +218,7 @@ fn encryption(data: Vec<u8>) -> std::result::Result<(Vec<u8>, Vec<u8>), Errors> 
 
             Ok((out, nonce.to_vec()))
         }
-        EncriptionAlgorithms::ATOM => {
+        EncryptionAlgorithms::ATOM => {
             let nonce = atomcrpyt::nonce();
             let password = get_password()?;
             let pwd = password.as_str();
@@ -231,7 +231,7 @@ fn encryption(data: Vec<u8>) -> std::result::Result<(Vec<u8>, Vec<u8>), Errors> 
 
 fn decryption(data: Vec<u8>, nonce_bytes: Vec<u8>) -> Result<Vec<u8>, Errors> {
     match get_encryption_algorithm().unwrap() {
-        EncriptionAlgorithms::AES => {
+        EncryptionAlgorithms::AES => {
             let key_hash = hash_key(get_password()?.as_str());
             let key = Key::<aes_gcm::Aes256Gcm>::from_slice(&key_hash);
             let cipher = aes_gcm::Aes256Gcm::new(&key);
@@ -241,7 +241,7 @@ fn decryption(data: Vec<u8>, nonce_bytes: Vec<u8>) -> Result<Vec<u8>, Errors> {
                 .decrypt(nonce, &*data)
                 .map_err(|e| Errors::AesDecryptionError(e.to_string()))
         }
-        EncriptionAlgorithms::ATOM => {
+        EncryptionAlgorithms::ATOM => {
             let password = get_password()?;
             let pwd = password.as_str();
             let decrypted_data = atomcrpyt::decrpyt(pwd, &data, &nonce_bytes);
