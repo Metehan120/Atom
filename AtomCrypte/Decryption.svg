@@ -20,7 +20,7 @@
   <line x1="400" y1="100" x2="400" y2="130" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
   
   <rect x="300" y="130" width="200" height="40" rx="5" fill="#d9d9d9" stroke="#333" stroke-width="2"/>
-  <text x="400" y="155" font-family="Arial" font-size="16" text-anchor="middle">Separate Data and MAC</text>
+  <text x="400" y="155" font-family="Arial" font-size="16" text-anchor="middle">Split Data and MAC</text>
   
   <!-- Key Derivation -->
   <line x1="175" y1="160" x2="175" y2="190" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
@@ -84,8 +84,7 @@
   <rect x="300" y="450" width="200" height="40" rx="5" fill="#ffffcc" stroke="#999900" stroke-width="2"/>
   <text x="400" y="475" font-family="Arial" font-size="16" text-anchor="middle">Block Unmixing</text>
   
-  <!-- Show nonce dependency for unmix blocks -->
-  <line x1="750" y1="450" x2="500" y2="450" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <!-- Show only nonce dependency for unmix blocks, no password needed -->
   <line x1="625" y1="400" x2="675" y2="400" stroke="#666" stroke-width="2"/>
   <line x1="675" y1="400" x2="675" y2="470" stroke="#666" stroke-width="2"/>
   <line x1="675" y1="470" x2="500" y2="470" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
@@ -129,11 +128,11 @@
   
   <!-- Output -->
   <rect x="300" y="730" width="200" height="40" rx="5" fill="#b3e0ff" stroke="#0066cc" stroke-width="2"/>
-  <text x="400" y="755" font-family="Arial" font-size="16" text-anchor="middle">Original Data</text>
+  <text x="400" y="755" font-family="Arial" font-size="16" text-anchor="middle">Decrypted Data</text>
   
   <!-- MAC Verification Failed -->
   <rect x="550" y="700" width="200" height="40" rx="5" fill="#ffcccc" stroke="#cc0000" stroke-width="2"/>
-  <text x="650" y="725" font-family="Arial" font-size="16" text-anchor="middle">MAC Verification Failed</text>
+  <text x="650" y="725" font-family="Arial" font-size="16" text-anchor="middle">Decryption Failed</text>
   
   <!-- Arrow for MAC verification failure -->
   <line x1="500" y1="680" x2="550" y2="700" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
