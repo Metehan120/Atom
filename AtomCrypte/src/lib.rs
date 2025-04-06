@@ -170,7 +170,6 @@ fn in_s_bytes(data: &[u8], nonce: &[u8], pwd: &[u8]) -> Vec<u8> {
 }
 
 fn s_bytes(data: &[u8], sbox: &[u8; 256]) -> Vec<u8> {
-    println!("S-Box: {:?}", sbox);
     data.par_iter().map(|b| sbox[*b as usize]).collect() // Apply the sbox
 }
 
@@ -224,8 +223,6 @@ fn dynamic_chunk_shift(data: &[u8], nonce: &[u8], password: &[u8]) -> Vec<u8> {
     let mut shifted = Vec::new();
     let mut cursor = 0;
 
-    println!("Before Shift: {:?}", data);
-
     for (i, size) in chunk_sizes.iter().enumerate() {
         let mut chunk = data[cursor..cursor + size].to_vec();
 
@@ -240,8 +237,6 @@ fn dynamic_chunk_shift(data: &[u8], nonce: &[u8], password: &[u8]) -> Vec<u8> {
         shifted.par_extend(chunk);
         cursor += size; // Move the cursor to the next chunk
     }
-
-    println!("After Shift: {:?}", shifted);
 
     shifted
 }
