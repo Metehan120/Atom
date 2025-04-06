@@ -170,6 +170,7 @@ fn in_s_bytes(data: &[u8], nonce: &[u8], pwd: &[u8]) -> Vec<u8> {
 }
 
 fn s_bytes(data: &[u8], sbox: &[u8; 256]) -> Vec<u8> {
+    println!("S-Box: {:?}", sbox);
     data.par_iter().map(|b| sbox[*b as usize]).collect() // Apply the sbox
 }
 
@@ -213,12 +214,17 @@ fn get_chunk_sizes(data_len: usize, nonce: &[u8], key: &[u8]) -> Vec<usize> {
     sizes
 }
 
-fn dynamic_chunk_shift(data: &[u8], nonce: &[u8]) -> Vec<u8> {
-    let key = blake3::hash(nonce).as_bytes().to_vec();
+fn dynamic_chunk_shift(data: &[u8], nonce: &[u8], password: &[u8]) -> Vec<u8> {
+    let key = blake3::hash(&[nonce, password].concat())
+        .as_bytes()
+        .to_vec();
+
     let chunk_sizes = get_chunk_sizes(data.len(), nonce, &key);
 
     let mut shifted = Vec::new();
     let mut cursor = 0;
+
+    println!("Before Shift: {:?}", data);
 
     for (i, size) in chunk_sizes.iter().enumerate() {
         let mut chunk = data[cursor..cursor + size].to_vec();
@@ -235,11 +241,15 @@ fn dynamic_chunk_shift(data: &[u8], nonce: &[u8]) -> Vec<u8> {
         cursor += size; // Move the cursor to the next chunk
     }
 
+    println!("After Shift: {:?}", shifted);
+
     shifted
 }
 
-fn dynamic_chunk_unshift(data: &[u8], nonce: &[u8]) -> Vec<u8> {
-    let key = blake3::hash(nonce).as_bytes().to_vec();
+fn dynamic_chunk_unshift(data: &[u8], nonce: &[u8], password: &[u8]) -> Vec<u8> {
+    let key = blake3::hash(&[nonce, password].concat())
+        .as_bytes()
+        .to_vec();
     let chunk_sizes = get_chunk_sizes(data.len(), nonce, &key);
 
     let mut original = Vec::new();
@@ -263,14 +273,14 @@ fn dynamic_chunk_unshift(data: &[u8], nonce: &[u8]) -> Vec<u8> {
     original
 }
 
-pub fn encrpyt(pwd: &str, data: &[u8], nonce: &[u8]) -> Result<Vec<u8>, Errors> {
+pub fn encrypt(pwd: &str, data: &[u8], nonce: &[u8]) -> Result<Vec<u8>, Errors> {
     let pwd = derive_key(pwd, nonce);
     let pwd = encrypt_password(&pwd, nonce);
     let mut out_vec = Vec::new();
 
     let s_block = generate_dynamic_sbox(nonce, &pwd);
     let mixed_data = mix_blocks(&mut s_bytes(data, &s_block), nonce);
-    let mixed_data = dynamic_chunk_shift(&mixed_data, nonce);
+    let mixed_data = dynamic_chunk_shift(&mixed_data, nonce, &pwd);
     let crypted = xor_encrypt(nonce, &pwd, &mixed_data)?;
 
     let mac = *blake3::keyed_hash(blake3::hash(&crypted).as_bytes(), &data).as_bytes(); // Generate a MAC for the data
@@ -281,7 +291,7 @@ pub fn encrpyt(pwd: &str, data: &[u8], nonce: &[u8]) -> Result<Vec<u8>, Errors> 
     Ok(out_vec)
 }
 
-pub fn decrpyt(pwd: &str, data: &[u8], nonce: &[u8]) -> Result<Vec<u8>, Errors> {
+pub fn decrypt(pwd: &str, data: &[u8], nonce: &[u8]) -> Result<Vec<u8>, Errors> {
     let pwd = derive_key(pwd, nonce);
     let pwd = encrypt_password(&pwd, nonce);
 
@@ -296,7 +306,7 @@ pub fn decrpyt(pwd: &str, data: &[u8], nonce: &[u8]) -> Result<Vec<u8>, Errors> 
     let (crypted, mac_key) = data.split_at(total_len - 32);
 
     let xor_decrypted = xor_decrypt(nonce, &pwd, crypted)?;
-    let mut unshifted = dynamic_chunk_unshift(&xor_decrypted, nonce);
+    let mut unshifted = dynamic_chunk_unshift(&xor_decrypted, nonce, &pwd);
     let unmixed = unmix_blocks(&mut unshifted, nonce);
     let decrypted_data = in_s_bytes(&unmixed, nonce, &pwd);
 
