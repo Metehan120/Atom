@@ -1,3 +1,4 @@
+use argon2::{Argon2, password_hash::SaltString};
 use blake3::derive_key;
 use rand::{TryRngCore, rngs::OsRng};
 use rayon::prelude::*;
@@ -12,6 +13,10 @@ pub enum Errors {
     InvalidMac(String),
     #[error("XOR failed: {0}")]
     InvalidXor(String),
+    #[error("Thread Pool Failed: {0}")]
+    ThreadPool(String),
+    #[error("Argon2 failed: {0}")]
+    Argon2Failed(String),
 }
 
 pub fn nonce() -> Result<[u8; 32], Errors> {
@@ -24,8 +29,6 @@ pub fn nonce() -> Result<[u8; 32], Errors> {
 }
 
 fn xor_encrypt(nonce: &[u8], pwd: &[u8], input: &[u8]) -> Result<Vec<u8>, Errors> {
-    let pwd = encrypt_password(&pwd, nonce);
-
     let out = input
         .par_iter()
         .enumerate()
@@ -47,8 +50,6 @@ fn xor_encrypt(nonce: &[u8], pwd: &[u8], input: &[u8]) -> Result<Vec<u8>, Errors
 }
 
 fn xor_decrypt(nonce: &[u8], pwd: &[u8], input: &[u8]) -> Result<Vec<u8>, Errors> {
-    let pwd = encrypt_password(&pwd, nonce);
-
     let out = input
         .par_iter()
         .enumerate()
@@ -68,73 +69,76 @@ fn xor_decrypt(nonce: &[u8], pwd: &[u8], input: &[u8]) -> Result<Vec<u8>, Errors
     }
 }
 
-fn mix_blocks(data: &mut Vec<u8>, nonce: &[u8]) -> Vec<u8> {
+fn mix_blocks(data: &mut Vec<u8>, nonce: &[u8]) -> Result<Vec<u8>, Errors> {
+    let thread = num_cpus::get() / 2;
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread)
+        .build()
+        .map_err(|e| Errors::ThreadPool(e.to_string()))?;
+
     if data.len() < 3 {
-        return data.to_vec();
+        return Ok(data.to_vec());
     }
 
-    data.par_iter_mut()
-        .enumerate()
-        .map(|(i, byte)| {
-            let n = nonce[i % nonce.len()];
-            let mut byte = *byte;
-            byte = byte.wrapping_add(n);
-            byte = byte.rotate_right((n % 8) as u32); // Rotate the byte right by the nonce value
-            byte ^= n; // XOR the byte with the nonce
-            byte = byte.wrapping_add(n);
+    let pool = pool.install(|| {
+        data.into_par_iter()
+            .enumerate()
+            .map(|(i, byte)| {
+                let n = nonce[i % nonce.len()];
+                let mut byte = *byte;
+                byte = byte.wrapping_add(n);
+                byte = byte.rotate_right((n % 8) as u32); // Rotate the byte right by the nonce value
+                byte ^= n; // XOR the byte with the nonce
+                byte = byte.wrapping_add(n);
 
-            byte
-        })
-        .collect::<Vec<u8>>()
+                byte
+            })
+            .collect::<Vec<u8>>()
+    });
+
+    Ok(pool)
 }
 
-fn unmix_blocks(data: &mut Vec<u8>, nonce: &[u8]) -> Vec<u8> {
+fn unmix_blocks(data: &mut Vec<u8>, nonce: &[u8]) -> Result<Vec<u8>, Errors> {
+    let thread = num_cpus::get() / 2;
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread)
+        .build()
+        .map_err(|e| Errors::ThreadPool(e.to_string()))?;
+
     if data.len() < 3 {
-        return data.to_vec();
+        return Ok(data.to_vec());
     }
 
-    data.par_iter_mut()
-        .enumerate()
-        .map(|(i, byte)| {
-            let n = nonce[i % nonce.len()];
-            let mut byte = *byte;
-            byte = byte.wrapping_sub(n);
-            byte ^= n; // XOR the byte with the nonce
-            byte = byte.rotate_left((n % 8) as u32); // Rotate the byte left by the nonce value
-            byte = byte.wrapping_sub(n);
+    let pool = pool.install(|| {
+        data.into_par_iter()
+            .enumerate()
+            .map(|(i, byte)| {
+                let n = nonce[i % nonce.len()];
+                let mut byte = *byte;
+                byte = byte.wrapping_sub(n);
+                byte ^= n; // XOR the byte with the nonce
+                byte = byte.rotate_left((n % 8) as u32); // Rotate the byte left by the nonce value
+                byte = byte.wrapping_sub(n);
 
-            byte
-        })
-        .collect::<Vec<u8>>()
+                byte
+            })
+            .collect::<Vec<u8>>()
+    });
+
+    Ok(pool)
 }
 
-fn encrypt_password(pwd: &[u8], salt: &[u8]) -> Vec<u8> {
-    let mut pwd = pwd.to_vec();
+fn encrypt_password(pwd: &[u8], salt: &[u8]) -> Result<Vec<u8>, Errors> {
+    let salt = SaltString::encode_b64(salt).map_err(|e| Errors::Argon2Failed(e.to_string()))?;
+    let argon = Argon2::default();
 
-    for _x in 0..100 {
-        // 100 rounds of encryption (to make it slower and safer)
-        for round in 0..=3 {
-            pwd.par_iter_mut().enumerate().for_each(|(i, byte)| {
-                let n = salt[i % salt.len()];
-                match round {
-                    0 => *byte = byte.wrapping_add(n),
-                    1 => {
-                        *byte = byte.rotate_right((n % 9) as u32); // Rotate the byte right by the nonce value
-                        *byte ^= n; // XOR the byte with the nonce
-                    }
-                    2 => *byte = byte.wrapping_add(n),
-                    3 => *byte = byte.wrapping_mul(n | 1), // Ensure odd
-                    _ => unreachable!(),
-                }
-            });
-        }
+    let mut out = vec![0u8; 32]; // 256-bit key
+    argon
+        .hash_password_into(pwd, salt.as_str().as_bytes(), &mut out)
+        .map_err(|e| Errors::Argon2Failed(e.to_string()))?;
 
-        if _x % 10 == 0 && _x > 0 {
-            pwd = blake3::hash(&pwd).as_bytes().to_vec(); // Hash the password to get a new password every 10 rounds
-        }
-    }
-
-    blake3::hash(&pwd).as_bytes().to_vec()
+    Ok(out)
 }
 
 fn generate_inv_s_box(s_box: &[u8; 256]) -> [u8; 256] {
@@ -143,6 +147,7 @@ fn generate_inv_s_box(s_box: &[u8; 256]) -> [u8; 256] {
         // Iterate over the s_box
         inv_s_box[val as usize] = i as u8; // Inverse the s_box
     }
+
     inv_s_box
 }
 
@@ -270,13 +275,19 @@ fn dynamic_chunk_unshift(data: &[u8], nonce: &[u8], password: &[u8]) -> Vec<u8> 
 
 pub fn encrypt(pwd: &str, data: &[u8], nonce: &[u8]) -> Result<Vec<u8>, Errors> {
     let pwd = derive_key(pwd, nonce);
-    let pwd = encrypt_password(&pwd, nonce);
+    let pwd = encrypt_password(&pwd, nonce)?;
     let mut out_vec = Vec::new();
 
     let s_block = generate_dynamic_sbox(nonce, &pwd);
-    let mixed_data = mix_blocks(&mut s_bytes(data, &s_block), nonce);
+    let mixed_data = mix_blocks(&mut s_bytes(data, &s_block), nonce)?;
     let mixed_data = dynamic_chunk_shift(&mixed_data, nonce, &pwd);
-    let crypted = xor_encrypt(nonce, &pwd, &mixed_data)?;
+    let crypted = mixed_data
+        .par_chunks(dynamic_sizes(mixed_data.len() as u64) as usize)
+        .map(|data: &[u8]| {
+            xor_encrypt(nonce, &pwd, &data).unwrap_or_else(|e| panic!("XOR Encryption Error: {e}"))
+        })
+        .flatten()
+        .collect::<Vec<u8>>();
 
     let mac = *blake3::keyed_hash(blake3::hash(&crypted).as_bytes(), &data).as_bytes(); // Generate a MAC for the data
 
@@ -288,7 +299,7 @@ pub fn encrypt(pwd: &str, data: &[u8], nonce: &[u8]) -> Result<Vec<u8>, Errors> 
 
 pub fn decrypt(pwd: &str, data: &[u8], nonce: &[u8]) -> Result<Vec<u8>, Errors> {
     let pwd = derive_key(pwd, nonce);
-    let pwd = encrypt_password(&pwd, nonce);
+    let pwd = encrypt_password(&pwd, nonce)?;
 
     let total_len = data.len();
 
@@ -300,10 +311,17 @@ pub fn decrypt(pwd: &str, data: &[u8], nonce: &[u8]) -> Result<Vec<u8>, Errors> 
 
     let (crypted, mac_key) = data.split_at(total_len - 32);
 
-    let xor_decrypted = xor_decrypt(nonce, &pwd, crypted)?;
+    let xor_decrypted = crypted
+        .to_vec()
+        .par_chunks_mut(dynamic_sizes(crypted.len() as u64) as usize)
+        .map(|data: &mut [u8]| {
+            xor_decrypt(nonce, &pwd, data).unwrap_or_else(|e| panic!("XOR Decryption Error: {e}"))
+        })
+        .flatten()
+        .collect::<Vec<u8>>();
     let mut unshifted = dynamic_chunk_unshift(&xor_decrypted, nonce, &pwd);
     let unmixed = unmix_blocks(&mut unshifted, nonce);
-    let decrypted_data = in_s_bytes(&unmixed, nonce, &pwd);
+    let decrypted_data = in_s_bytes(&unmixed?, nonce, &pwd);
 
     let mac = blake3::keyed_hash(blake3::hash(&crypted).as_bytes(), &decrypted_data); // Generate a MAC for the data
 

@@ -41,12 +41,7 @@ Due to its computational complexity and chunk-heavy structure, AtomCrypte is **n
         b = b >>> (N[i % len(N)] % 8)``
 
 ## Math Behind Password Strengthening:
-1. For 100 iterations:
-   - ``Add: P[i] = P[i] + N[i % len(N)]``
-   - ``Rotate & XOR: P[i] = (P[i] >>> 3) ⊕ N[i % len(N)]``
-   - ``Add: P[i] = P[i] + N[i % len(N)]``
-   - ``Multiply: P[i] = P[i] * (N[i % len(N)] | 1)``
-   - ``Every 10 iterations: P = Blake3(P)``
+1. Argon2 👍.
 
 ## Encryption Flow:
 1. ``K = encrypt_password(derive_key(password, nonce), nonce)``
